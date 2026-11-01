@@ -44,6 +44,43 @@ h264rgb film.mkv
   Danach kann man ohne Neustart den nächsten Film starten.
 - `h264rgb ?` zeigt Version und Credits.
 
+## Hinweise
+
+### 1. Ton-Datei (.snd) erstellen
+
+Für den Ton braucht h264rgb eine `.snd`-Datei mit demselben Namen wie der Film.
+Am PC (oder mit ffmpeg auf dem Amiga):
+
+```
+ffmpeg -i film.mkv -vn -ac 2 -ar 22050 -f s8 film.snd
+```
+
+`film.snd` neben `film.mkv` legen, fertig. Mehr dazu unter [Ton](#ton).
+
+### 2. „FEHLER FPS“ – Film ohne Bildrate im Video-Kopf
+
+Manche Filme haben im Video-Kopf (SPS) **keine Bildrate**. h264rgb bricht dann ab mit:
+
+```
+FEHLER FPS: SPS enthaelt keine VUI timing_info; Framerate kann nicht sicher bestimmt werden.
+```
+
+Oft steht die Bildrate aber weiter hinten im Video. Dann lässt sich der Film am PC
+**ohne Neukodieren** in zwei Schritten reparieren:
+
+```
+ffmpeg -i film.mkv -map 0:v -c copy -bsf:v h264_mp4toannexb -f h264 film_video.h264
+ffmpeg -r 24000/1001 -i film_video.h264 -i film.mkv -map 0:v -map 1:a -c copy film_fix.mkv
+```
+
+- Bei `-r` die **Bildrate des Films** eintragen: `24000/1001` (23,976), `24`, `25`,
+  `30000/1001` (29,97) oder `30`. Welche es ist, zeigt
+  `ffprobe -v error -select_streams v -show_entries stream=r_frame_rate film.mkv`.
+- Danach `film_fix.mkv` abspielen. Die `.snd`-Datei dazu muss `film_fix.snd` heißen.
+- Hilft das nicht, steht die Bildrate nirgends im Video. Dann muss der Film neu
+  kodiert werden, zum Beispiel:
+  `ffmpeg -i film.mkv -c:v libx264 -crf 20 -c:a copy film_fix.mkv`
+
 ## Ton
 
 Der Ton wird **vorher am PC** (oder mit ffmpeg auf dem Amiga) in eine einfache
@@ -81,7 +118,7 @@ Paula-Runden 223, Korrekturen 0, Bildwechsel 49.92 Hz
 - **10-Bit-Video** (High 10) und 4:2:2 – das kann der Hardware-Decoder des Pi 3 nicht.
 - **Größer als 1080p** (zum Beispiel 4K).
 - **Filme ohne Bildrate im Video-Kopf** (SPS ohne VUI `timing_info`). h264rgb meldet dann
-  „FEHLER FPS“.
+  „FEHLER FPS“. Reparatur siehe [Hinweise](#2-fehler-fps--film-ohne-bildrate-im-video-kopf).
 - **Über 50 Bilder pro Sekunde**. Filme über 25 Bilder pro Sekunde werden auf 25 reduziert.
 - **Einzelbilder größer als 256 KiB** (sehr hohe Bitraten).
 - **MP4 mit sehr großem Inhaltsverzeichnis** (`moov` über 8 MiB).
@@ -151,6 +188,14 @@ picture. Without a `.snd` file the film plays silently.
 Not supported: codecs other than H.264, containers other than `.mkv`/`.mp4`,
 10-bit or 4:2:2 video, above 1080p, streams whose SPS has no VUI timing info,
 more than 50 fps, single frames over 256 KiB, MP4 `moov` over 8 MiB.
+
+"FEHLER FPS" means the SPS in the file header has no frame rate. Often a later
+in-stream SPS has it; then remux without re-encoding (set `-r` to the film's rate):
+
+```
+ffmpeg -i film.mkv -map 0:v -c copy -bsf:v h264_mp4toannexb -f h264 film_video.h264
+ffmpeg -r 24000/1001 -i film_video.h264 -i film.mkv -map 0:v -map 1:a -c copy film_fix.mkv
+```
 
 To build, run `vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb src/h264rgb14d.s`
 with vasm 2.0f. The result is byte-identical to `amiga/h264rgb`.
