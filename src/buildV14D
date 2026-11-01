@@ -1,0 +1,2 @@
+; H264RGB V14D build script - AmigaDOS
+vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb h264rgb14d.s
