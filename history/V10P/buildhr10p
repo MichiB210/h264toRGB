@@ -1,0 +1,3 @@
+; H264RGB10P build script - AmigaDOS
+; Fertige EXE h264rgb ist bereits im Paket; nur zum Neuassemblieren noetig.
+vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb h264rgb10p.s
