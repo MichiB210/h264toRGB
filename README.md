@@ -7,7 +7,7 @@ Der Raspberry Pi im PiStorm entschlüsselt das Video in Hardware
 
 *English summary below.*
 
-Aktueller Stand: **V14D**.
+Aktueller Stand: **V14E**.
 
 ## Was man braucht
 
@@ -57,15 +57,22 @@ ffmpeg -i film.mkv -vn -ac 2 -ar 22050 -f s8 film.snd
 
 `film.snd` neben `film.mkv` legen, fertig. Mehr dazu unter [Ton](#ton).
 
-### 2. „FEHLER FPS“ – Film ohne Bildrate im Video-Kopf
+### 2. Film ohne Bildrate im Video-Kopf / „FEHLER FPS“
 
-Manche Filme haben im Video-Kopf (SPS) **keine Bildrate**. h264rgb bricht dann ab mit:
+Manche Filme haben im Video-Kopf (SPS) **keine Bildrate**. Seit **V14E** nimmt h264rgb
+sie dann aus der MKV- oder MP4-Datei und zeigt beim Start:
+
+```
+Hinweis: Bildrate fehlt im Video-Kopf - nehme sie aus der MKV-Datei.
+```
+
+Nur wenn auch die Datei selbst keine Bildrate enthält, bricht h264rgb ab mit:
 
 ```
 FEHLER FPS: SPS enthaelt keine VUI timing_info; Framerate kann nicht sicher bestimmt werden.
 ```
 
-Oft steht die Bildrate aber weiter hinten im Video. Dann lässt sich der Film am PC
+Oft steht die Bildrate dann aber weiter hinten im Video. Dann lässt sich der Film am PC
 **ohne Neukodieren** in zwei Schritten reparieren:
 
 ```
@@ -80,6 +87,12 @@ ffmpeg -r 24000/1001 -i film_video.h264 -i film.mkv -map 0:v -map 1:a -c copy fi
 - Hilft das nicht, steht die Bildrate nirgends im Video. Dann muss der Film neu
   kodiert werden, zum Beispiel:
   `ffmpeg -i film.mkv -c:v libx264 -crf 20 -c:a copy film_fix.mkv`
+
+### 3. Film startet nicht mehr – Amiga neu starten
+
+Startet ein Film nicht oder bleibt das Bild schwarz – zum Beispiel nach einem Abbruch
+mit **Ctrl-C** –, hängt vermutlich der VideoCore des Pi. Dann hilft ein **Reset des
+Amiga**. Danach läuft der Film wieder.
 
 ## Ton
 
@@ -117,8 +130,8 @@ Paula-Runden 223, Korrekturen 0, Bildwechsel 49.92 Hz
 - **Andere Container**: nur `.mkv` und `.mp4` (erkannt an der Endung), kein AVI, TS, MOV, M4V.
 - **10-Bit-Video** (High 10) und 4:2:2 – das kann der Hardware-Decoder des Pi 3 nicht.
 - **Größer als 1080p** (zum Beispiel 4K).
-- **Filme ohne Bildrate im Video-Kopf** (SPS ohne VUI `timing_info`). h264rgb meldet dann
-  „FEHLER FPS“. Reparatur siehe [Hinweise](#2-fehler-fps--film-ohne-bildrate-im-video-kopf).
+- **Filme ganz ohne Bildrate** – weder im Video-Kopf noch in der MKV/MP4-Datei. h264rgb meldet
+  dann „FEHLER FPS“. Reparatur siehe [Hinweise](#2-film-ohne-bildrate-im-video-kopf--fehler-fps).
 - **Über 50 Bilder pro Sekunde**. Filme über 25 Bilder pro Sekunde werden auf 25 reduziert.
 - **Einzelbilder größer als 256 KiB** (sehr hohe Bitraten).
 - **MP4 mit sehr großem Inhaltsverzeichnis** (`moov` über 8 MiB).
@@ -130,10 +143,10 @@ Der Player ist komplett in 68000-Assembler geschrieben, die Quelle liegt in [`sr
 Gebaut wird mit **vasm 2.0f** (`vasmm68k_mot`):
 
 ```
-vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb h264rgb14d.s
+vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb h264rgb14e.s
 ```
 
-Auf dem Amiga geht das auch mit `Execute buildV14D`. Das Ergebnis ist genau
+Auf dem Amiga geht das auch mit `Execute buildV14E`. Das Ergebnis ist genau
 dieselbe Datei wie `amiga/h264rgb` (siehe `SHA256SUMS.txt`).
 
 ## Ältere Versionen
@@ -150,7 +163,8 @@ Unter [`history/`](history) liegen die Vorgänger mit Quelltext und Programmdate
 | V14A | Paula-Ton aus einer `.snd`-Datei (Test) |
 | V14B | Bild bleibt beim Ton, Statistik am Ende (Test) |
 | V14C | Ton aus einem Ringpuffer statt Pufferwechsel (Test) |
-| **V14D** (aktuell) | RGB fest auf PAL 50 Hz, gemessene Bildwechsel-Frequenz |
+| V14D | RGB fest auf PAL 50 Hz, gemessene Bildwechsel-Frequenz |
+| **V14E** (aktuell) | Bildrate aus MKV/MP4, wenn sie im Video-Kopf fehlt |
 
 Die Tabellen `ham.bin`, `edge.bin` und `state.bin` sind in allen Versionen gleich.
 
@@ -169,7 +183,7 @@ Gebaut von **MichiB210** zusammen mit ChatGPT und Claude.
 h264toRGB plays H.264 video (MKV/MP4) on the Amiga's **native RGB output**, with
 **sound through Paula**. The Raspberry Pi 3A+ in a PiStorm decodes the video in
 hardware via VideoCore/MMAL. The Amiga shows it as **HAM6, 192×144, up to 25 fps**.
-Current version: V14D.
+Current version: V14E.
 
 Requirements: Amiga 500/2000 (PAL) with PiStorm and Pi 3A+, Emu68 1.0.7,
 AmigaOS 3.2.3, and `gpu_mem=64` for 1080p streams. h264rgb forces the chipset
@@ -186,18 +200,23 @@ Paula plays it from a looping Chip-RAM ring locked to the same clock as the
 picture. Without a `.snd` file the film plays silently.
 
 Not supported: codecs other than H.264, containers other than `.mkv`/`.mp4`,
-10-bit or 4:2:2 video, above 1080p, streams whose SPS has no VUI timing info,
+10-bit or 4:2:2 video, above 1080p, films without any frame rate information,
 more than 50 fps, single frames over 256 KiB, MP4 `moov` over 8 MiB.
 
-"FEHLER FPS" means the SPS in the file header has no frame rate. Often a later
-in-stream SPS has it; then remux without re-encoding (set `-r` to the film's rate):
+Since V14E a missing frame rate in the SPS is taken from the MKV (DefaultDuration)
+or MP4 (track duration / sample count). "FEHLER FPS" only appears if the file has
+no frame rate at all. Often a later in-stream SPS has it; then remux without
+re-encoding (set `-r` to the film's rate):
 
 ```
 ffmpeg -i film.mkv -map 0:v -c copy -bsf:v h264_mp4toannexb -f h264 film_video.h264
 ffmpeg -r 24000/1001 -i film_video.h264 -i film.mkv -map 0:v -map 1:a -c copy film_fix.mkv
 ```
 
-To build, run `vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb src/h264rgb14d.s`
+If a film no longer starts (for example after Ctrl-C), the Pi's VideoCore has probably
+hung - reset the Amiga.
+
+To build, run `vasmm68k_mot -m68000 -Fhunkexe -nosym -o h264rgb src/h264rgb14e.s`
 with vasm 2.0f. The result is byte-identical to `amiga/h264rgb`.
 
 License: MIT.
